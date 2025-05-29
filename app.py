@@ -91,10 +91,15 @@ def switch_camera(camera_id):
 
 @app.route('/get_all_detections')
 def get_all_detections():
-    # Get total counts and recent detections for all cameras
     total_counts = db.get_total_counts()
     recent_all = db.get_recent_detections_all(limit=30)
-    
+
+    for det in recent_all:
+        if isinstance(det["timestamp"], datetime):
+            det["timestamp"] = det["timestamp"].isoformat()
+        if isinstance(det.get("created_at"), datetime):
+            det["created_at"] = det["created_at"].isoformat()
+
     return jsonify({
         "total_counts": total_counts,
         "recent_detections": recent_all

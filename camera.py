@@ -187,7 +187,7 @@ class Camera:
                     # Get coordinates
                     x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                     conf = float(box.conf[0].item())
-                    
+
                     # Enhanced person tracking with position and size
                     person_width = x2 - x1
                     person_height = y2 - y1
