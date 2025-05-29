@@ -11,7 +11,7 @@ TELEGRAM_CHAT_ID = '-4815636892'
 
 # Rate limiting for notifications
 last_notification_time = {}
-NOTIFICATION_COOLDOWN = 30  # 30 seconds between notifications from same camera
+NOTIFICATION_COOLDOWN = 30
 
 def ensure_dirs(directory_list):
     """Ensure directories exist"""

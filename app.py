@@ -7,14 +7,9 @@ from flask import Flask, Response, render_template, request, jsonify, send_from_
 from camera import CameraSystem
 from db import Database
 from utils import ensure_dirs
-import firebase_admin
-from firebase_admin import credentials, firestore
 
-cred = credentials.Certificate("firebase_credentials.json")
-if not firebase_admin._apps:
-    firebase_admin.initialize_app(cred)
-firebase_db = firestore.client()
 
+timestamp = datetime.now()
 # Define data directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "detection_data")
@@ -36,11 +31,11 @@ rtsp_cameras = {
     "Lobby Camera": "rtsp://rsrc2:rsrc1234@608905d16e93.sn.mynetname.net/chID=2&streamType=sub",
 }
 
-# Optimized settings (Best values fixed)
+# Optimized settings
 DETECTION_SETTINGS = {
-    'confidence_threshold': 0.55,  # Optimized confidence threshold
-    'detection_interval': 180,     # 3 minutes interval for same person
-    'frame_rate': 30,              # High frame rate for smooth video
+    'confidence_threshold': 0.55,
+    'detection_interval': 180,  
+    'frame_rate': 30,              
     'enable_notifications': True,
     'save_images': True,
     'telegram_token': '8174302723:AAGhfjOKjkTYH4lj4VVko9tN9lNiojQJDJk',
@@ -52,7 +47,12 @@ DETECTION_SETTINGS = {
 camera_system = CameraSystem(rtsp_cameras, IMAGES_DIR, DETECTION_SETTINGS)
 
 # Initialize the database
-db = Database(os.path.join(DATA_DIR, "detections.db"))
+db = Database(
+    host="localhost",
+    user="root",
+    password="",
+    database="detect_db"
+)
 
 # Global variables
 active_camera = list(rtsp_cameras.keys())[0]
@@ -89,35 +89,8 @@ def switch_camera(camera_id):
         return jsonify({"status": "success", "message": f"Switched to {camera_id}"})
     return jsonify({"status": "error", "message": "Camera not found"})
 
-@app.route('/get_detections')
-def get_detections():
-    """Get detection data from Firestore"""
-    camera_id = request.args.get('camera_id', active_camera)
-
-    # เรียงลำดับให้ถูก
-    docs = firebase_db.collection("detections")\
-        .where("camera_id", "==", camera_id)\
-        .order_by("timestamp", direction=firestore.Query.DESCENDING)\
-        .limit(15)\
-        .stream()
-
-    # ดึงข้อมูลพร้อมแปลง confidence → %
-    recent_detections = []
-    for doc in docs:
-        d = doc.to_dict()
-        d["confidence"] = round(float(d.get("confidence", 0)) * 100, 2)
-        recent_detections.append(d)
-
-    counts = db.get_detection_counts(camera_id)
-
-    return jsonify({
-        "detections": recent_detections,
-        "counts": counts
-    })
-
 @app.route('/get_all_detections')
 def get_all_detections():
-    """Get detection data for all cameras"""
     # Get total counts and recent detections for all cameras
     total_counts = db.get_total_counts()
     recent_all = db.get_recent_detections_all(limit=30)
@@ -232,9 +205,10 @@ def get_system_stats():
     
     return jsonify(stats)
 
+from datetime import datetime
+
 @app.route('/update_detection', methods=['POST'])
 def update_detection():
-    """Update detection data from camera processes"""
     data = request.json
     
     if not data:
@@ -246,21 +220,12 @@ def update_detection():
     try:
         db.add_detection(
             camera_id=data['camera_id'],
-            timestamp=data['timestamp'],
+            timestamp=datetime.now().isoformat(),
             confidence=data['confidence'],
             image_path=data.get('image_path', '')
         )
 
-        # Add detection to Firebase
-        firebase_db.collection("detections").add({
-            "camera_id": data['camera_id'],
-            "timestamp": data['timestamp'],
-            "confidence": data['confidence'],
-            "image_path": data.get('image_path', ''),
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
-
-        print(f"Detection from {data['camera_id']} saved to Firebase")
+        print(f"Detection from {data['camera_id']} saved to DB")
 
         return jsonify({"status": "success"}), 200
 
@@ -276,30 +241,20 @@ def delete_detection():
 
     try:
         db._connect()
-        db.cursor.execute("SELECT camera_id, timestamp FROM detections WHERE id = ?", (detection_id,))
+        db.cursor.execute("SELECT id, camera_id FROM detections WHERE id = %s", (detection_id,))
         row = db.cursor.fetchone()
         db._disconnect()
 
         if row is None:
             return jsonify({'status': 'error', 'message': 'Detection not found'}), 404
-        
-        camera_id, timestamp = row
 
         db._connect()
-        db.cursor.execute("DELETE FROM detections WHERE id = ?", (detection_id,))
+        db.cursor.execute("DELETE FROM detections WHERE id = %s", (detection_id,))
         db.conn.commit()
         db._disconnect()
 
-        query = firebase_db.collection("detections") \
-            .where("camera_id", "==", camera_id) \
-            .where("timestamp", "==", timestamp) \
-            .stream()
-
-        for doc in query:
-            doc.reference.delete()
-
         return jsonify({'status': 'success'})
-    
+
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

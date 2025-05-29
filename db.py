@@ -1,172 +1,135 @@
-# db.py - Database handling for person detection system
+# db.py - MariaDB/MySQL compatible version using PyMySQL
 
-import sqlite3
-import os
+import pymysql
 from datetime import datetime, timedelta
-import firebase_admin
-from firebase_admin import credentials, firestore
-
-# 🔐 Firebase setup
-cred = credentials.Certificate("firebase_credentials.json")
-firebase_admin.initialize_app(cred)
-firebase_db = firestore.client()
 
 class Database:
-    def __init__(self, db_path):
-        """Initialize database connection"""
-        self.db_path = db_path
+    def __init__(self, host, user, password, database):
+        self.config = {
+            'host': host,
+            'user': user,
+            'password': password,
+            'database': database,
+            'autocommit': True,
+            'cursorclass': pymysql.cursors.DictCursor
+        }
         self.conn = None
         self.cursor = None
 
     def _connect(self):
-        """Connect to the database"""
-        self.conn = sqlite3.connect(self.db_path)
-        self.conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+        self.conn = pymysql.connect(**self.config)
         self.cursor = self.conn.cursor()
 
     def _disconnect(self):
-        """Disconnect from the database"""
         if self.conn:
             self.conn.close()
             self.conn = None
             self.cursor = None
 
     def initialize(self):
-        """Initialize database tables"""
         self._connect()
-
-        # Create detections table
+        # สร้างตารางถ้ายังไม่มี
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS detections (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            camera_id TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            confidence REAL NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            camera_id VARCHAR(100) NOT NULL,
+            timestamp DATETIME NOT NULL,
+            confidence FLOAT NOT NULL,
             image_path TEXT,
-            created_at TEXT NOT NULL
+            created_at DATETIME NOT NULL
         )
         ''')
-
-        # Create index for faster queries
-        self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_camera_timestamp ON detections (camera_id, timestamp)')
-
-        self.conn.commit()
+        
+        self.cursor.execute('''
+            SELECT COUNT(1) AS idx_exists
+            FROM information_schema.statistics 
+            WHERE table_schema = %s AND table_name = 'detections' AND index_name = 'idx_camera_timestamp'
+        ''', (self.config['database'],))
+        exists = self.cursor.fetchone()
+        if exists['idx_exists'] == 0:
+            self.cursor.execute('''
+                CREATE INDEX idx_camera_timestamp 
+                ON detections (camera_id, timestamp)
+            ''')
         self._disconnect()
 
     def add_detection(self, camera_id, timestamp, confidence, image_path=""):
-        """Add a new detection to SQLite and Firebase"""
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Save to SQLite
         self._connect()
         self.cursor.execute('''
-        INSERT INTO detections (camera_id, timestamp, confidence, image_path, created_at)
-        VALUES (?, ?, ?, ?, ?)
+            INSERT INTO detections (camera_id, timestamp, confidence, image_path, created_at)
+            VALUES (%s, %s, %s, %s, %s)
         ''', (camera_id, timestamp, confidence, image_path, created_at))
-        self.conn.commit()
         self._disconnect()
 
-        # Send to Firebase
-        try:
-            firebase_db.collection("detections").add({
-                "camera_id": camera_id,
-                "timestamp": timestamp,
-                "confidence": confidence,
-                "image_path": image_path,
-                "created_at": created_at
-            })
-        except Exception as e:
-            print("[Firebase Error]", e)
 
     def get_recent_detections(self, camera_id, limit=10):
-        """Get recent detections for a specific camera"""
         self._connect()
         self.cursor.execute('''
-        SELECT id, camera_id, timestamp, confidence, image_path 
-        FROM detections 
-        WHERE camera_id = ? 
-        ORDER BY timestamp DESC 
-        LIMIT ?
+            SELECT * FROM detections WHERE camera_id = %s 
+            ORDER BY timestamp DESC LIMIT %s
         ''', (camera_id, limit))
-        results = [dict(row) for row in self.cursor.fetchall()]
+        results = self.cursor.fetchall()
         self._disconnect()
         return results
 
     def get_recent_detections_all(self, limit=20):
-        """Get recent detections for all cameras"""
         self._connect()
         self.cursor.execute('''
-        SELECT id, camera_id, timestamp, confidence, image_path 
-        FROM detections 
-        ORDER BY timestamp DESC 
-        LIMIT ?
+            SELECT * FROM detections 
+            ORDER BY timestamp DESC LIMIT %s
         ''', (limit,))
-        results = [dict(row) for row in self.cursor.fetchall()]
+        results = self.cursor.fetchall()
         self._disconnect()
         return results
 
     def get_detection_counts(self, camera_id):
-        """Get detection counts for a specific camera"""
         self._connect()
         self.cursor.execute('''
-        SELECT COUNT(*) as person_count 
-        FROM detections 
-        WHERE camera_id = ?
+            SELECT COUNT(*) AS person_count FROM detections WHERE camera_id = %s
         ''', (camera_id,))
         result = self.cursor.fetchone()
-        count = result['person_count'] if result else 0
         self._disconnect()
-        return {"person": count}
+        return {"person": result['person_count'] if result else 0}
 
     def get_total_counts(self):
-        """Get total detection counts for all cameras"""
         self._connect()
         self.cursor.execute('''
-        SELECT camera_id, COUNT(*) as count 
-        FROM detections 
-        GROUP BY camera_id
+            SELECT camera_id, COUNT(*) AS count FROM detections GROUP BY camera_id
         ''')
         results = {row['camera_id']: row['count'] for row in self.cursor.fetchall()}
-        self.cursor.execute('SELECT COUNT(*) as total FROM detections')
+        self.cursor.execute('SELECT COUNT(*) AS total FROM detections')
         results['total'] = self.cursor.fetchone()['total']
         self._disconnect()
         return results
 
     def get_all_detections(self):
-        """Get all detections for export"""
         self._connect()
         self.cursor.execute('''
-        SELECT id, camera_id, timestamp, confidence, image_path 
-        FROM detections 
-        ORDER BY timestamp DESC
+            SELECT * FROM detections ORDER BY timestamp DESC
         ''')
-        results = [dict(row) for row in self.cursor.fetchall()]
+        results = self.cursor.fetchall()
         self._disconnect()
         return results
 
     def get_detections_by_date(self, date):
-        """Get detections for a specific date (YYYY-MM-DD)"""
         self._connect()
-        date_pattern = f"{date}%"
         self.cursor.execute('''
-        SELECT id, camera_id, timestamp, confidence, image_path 
-        FROM detections 
-        WHERE timestamp LIKE ? 
-        ORDER BY timestamp DESC
-        ''', (date_pattern,))
-        results = [dict(row) for row in self.cursor.fetchall()]
+            SELECT * FROM detections 
+            WHERE DATE(timestamp) = %s
+            ORDER BY timestamp DESC
+        ''', (date,))
+        results = self.cursor.fetchall()
         self._disconnect()
         return results
 
     def delete_old_detections(self, days=30):
-        """Delete detections older than specified days"""
-        self._connect()
         cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        self._connect()
         self.cursor.execute('''
-        DELETE FROM detections 
-        WHERE timestamp < ?
+            DELETE FROM detections WHERE DATE(timestamp) < %s
         ''', (cutoff_date,))
         deleted_count = self.cursor.rowcount
-        self.conn.commit()
         self._disconnect()
         return deleted_count
