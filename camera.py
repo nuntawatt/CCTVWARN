@@ -323,7 +323,7 @@ class Camera:
 🚨 <b>Person Detected | ตรวจพบบุคคล</b>
 
 <b>Camera | กล้อง:</b> {camera_id}
-<b>Detection | การตรวจจับ:</b> New Person | บุคคลใหม่
+<b>Detection | การตรวจจับ:</b> Person
 <b>Confidence | ความมั่นใจ:</b> {confidence:.0f}%
 <b>Time | เวลา:</b> {alert_time}
 <b>Location | ตำแหน่ง:</b> Zone {camera_id.split()[-1] if camera_id.split() else 'Unknown'}

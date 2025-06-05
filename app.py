@@ -28,7 +28,7 @@ rtsp_cameras = {
     "Front Gate Camera": "rtsp://rsrc2:rsrc1234@7dd608e038a9.sn.mynetname.net/chID=9&streamType=main",
     "Main Entrance": "rtsp://rsrc2:rsrc1234@7dd608e038a9.sn.mynetname.net/chID=2&streamType=main", 
     "Parking Area": "rtsp://rsrc2:rsrc1234@608905d16e93.sn.mynetname.net/chID=1&streamType=sub",
-    "Lobby Camera": "rtsp://rsrc2:rsrc1234@608905d16e93.sn.mynetname.net/chID=2&streamType=sub",
+    "Lobby Camera": "rtsp://rsrc2:rsrc1234@608905d16e93.sn.mynetname.net/chID=2&streamType=sub"
 }
 
 # Optimized settings
