@@ -35,9 +35,11 @@
 pip install -r requirements.txt
 
 2. **ดาวน์โหลดโมเดล YOLOv8**
+
 wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
 
 3. **ตั้งค่า Telegram Bot**
+
 - สร้างบอทผ่าน BotFather
 - ตั้งค่า TELEGRAM_BOT_TOKEN และ TELEGRAM_CHAT_ID ที่ utils.py หรือ app.py
 
