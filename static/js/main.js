@@ -8,7 +8,7 @@ class NTVisionDashboard {
             "Parking Area": "Parking Area",
             "Lobby Camera": "Lobby Camera"
         };
-
+        
         this.currentCamera = 'Front Gate Camera';
         this.isAutoRefresh = true;
         this.refreshInterval = 5000;
@@ -108,7 +108,6 @@ class NTVisionDashboard {
             });
         }
 
-        // Panel Refresh Buttons
         document.querySelectorAll('.panel-btn').forEach(btn => {
             btn.addEventListener('click', () => this.refreshPanelData());
         });
@@ -159,7 +158,6 @@ class NTVisionDashboard {
 
         this.updateMainVideoFeed();
     }
-
 
     formatCameraName(cameraName) {
         const nameMap = {
