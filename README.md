@@ -29,18 +29,15 @@
 ## เริ่มต้นใช้งาน
 
 1. ติดตั้งไลบรารีที่ต้องใช้  
-```bash
 pip install -r requirements.txt
 
 2. ดาวน์โหลดโมเดล YOLOv8 
-```bash
 wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
 
 3. ตั้งค่า Telegram Bot (ผ่าน BotFather)
 ใส่ TELEGRAM_BOT_TOKEN และ TELEGRAM_CHAT_ID ที่ utils.py, app.py
 
 4. เริ่มต้นระบบ
-```bash
 python app.py
 
 ---
