@@ -46,10 +46,12 @@ python app.py
 
 ---
 
+```markdown
 ## วิธีเพิ่มกล้อง RTSP
 **เพิ่มชื่อกล้องและลิงก์ใน 3 จุดหลัก**
 
 1. `app.py`
+```python
 rtsp_cameras = {
     "Front Gate": "rtsp://user:pass@ip:port/stream1",
     "Lobby": "rtsp://user:pass@ip:port/stream2",
@@ -57,6 +59,7 @@ rtsp_cameras = {
 }
 
 2. `main.js → ภายใน NTVisionDashboard constructor`
+```python
 this.cameras = {
     "Front Gate": "Front Gate",
     "Lobby": "Lobby",
@@ -64,6 +67,7 @@ this.cameras = {
 };
 
 3. `main.js → ภายใน formatCameraName()`
+```python
 "ชื่อกล้องใหม่": "ชื่อที่แสดงบนหน้าจอ"
 
 --- 
